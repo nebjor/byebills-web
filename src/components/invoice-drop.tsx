@@ -52,10 +52,10 @@ export default function InvoiceDrop({
       patch(item.id, { status: "reading" });
       const form = new FormData();
       form.append("file", item.file);
+      form.append("key", accessKey);
       try {
         const res = await fetch("/api/extract-demo", {
           method: "POST",
-          headers: { "x-drop-key": accessKey },
           body: form,
         });
         if (res.status === 401) {
@@ -147,7 +147,7 @@ export default function InvoiceDrop({
           ref={inputRef}
           type="file"
           multiple
-          accept="image/*,application/pdf"
+          accept="image/*,application/pdf,.pdf,.heic,.heif,.webp"
           className="hidden"
           onChange={(e) => {
             if (e.target.files?.length) handleFiles(e.target.files);

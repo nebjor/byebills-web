@@ -42,6 +42,14 @@ export default function DropPage() {
     setEntries([]);
   }
 
+  function lock() {
+    sessionStorage.removeItem(KEY_STORAGE);
+    setAccessKey(null);
+    setInput("");
+    setLocked(false);
+    setEntries([]);
+  }
+
   return (
     <div
       style={{ backgroundColor: CREAM, color: INK, fontFamily: "var(--font-nunito)" }}
@@ -59,6 +67,16 @@ export default function DropPage() {
             </span>
             <span className="text-[18px] font-bold">byeBills</span>
           </Link>
+
+          {accessKey && (
+            <button
+              onClick={lock}
+              className="text-sm font-medium hover:underline"
+              style={{ color: MUTED }}
+            >
+              Passwort ändern
+            </button>
+          )}
         </div>
 
         <div className="mb-8 text-center">
