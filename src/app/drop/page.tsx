@@ -88,7 +88,7 @@ export default function DropPage() {
           </h1>
           <p className="mt-2 text-[17px]" style={{ color: MUTED }}>
             Alle auf einmal — Billie liest sie parallel aus und verbucht sie
-            direkt in dein Milchbüechli.
+            direkt in deine Buchhaltung.
           </p>
         </div>
 
