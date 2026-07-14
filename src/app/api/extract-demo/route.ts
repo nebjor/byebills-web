@@ -9,6 +9,15 @@ const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 export async function POST(request: NextRequest) {
   try {
+    // Lightweight shared-password gate to avoid public LLM abuse.
+    const expected = process.env.DROP_DEMO_PASSWORD;
+    if (!expected) {
+      return NextResponse.json({ error: "Demo ist deaktiviert." }, { status: 503 });
+    }
+    if (request.headers.get("x-drop-key") !== expected) {
+      return NextResponse.json({ error: "Falsches Passwort." }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 

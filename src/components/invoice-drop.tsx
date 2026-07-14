@@ -21,9 +21,13 @@ interface DropFile {
 }
 
 export default function InvoiceDrop({
+  accessKey,
   onChange,
+  onUnauthorized,
 }: {
+  accessKey: string;
   onChange?: (entries: Entry[]) => void;
+  onUnauthorized?: () => void;
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<DropFile[]>([]);
@@ -51,8 +55,14 @@ export default function InvoiceDrop({
       try {
         const res = await fetch("/api/extract-demo", {
           method: "POST",
+          headers: { "x-drop-key": accessKey },
           body: form,
         });
+        if (res.status === 401) {
+          patch(item.id, { status: "error", error: "Falsches Passwort" });
+          onUnauthorized?.();
+          return;
+        }
         const result = await res.json();
         if (!res.ok) throw new Error(result.error || `HTTP ${res.status}`);
         patch(item.id, { status: "done", data: result.extraction as ExtractionData });
@@ -61,7 +71,7 @@ export default function InvoiceDrop({
         patch(item.id, { status: "error", error: msg });
       }
     },
-    [patch]
+    [patch, accessKey, onUnauthorized]
   );
 
   const handleFiles = useCallback(
