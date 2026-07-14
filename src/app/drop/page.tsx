@@ -100,10 +100,21 @@ export default function DropPage() {
         )}
 
         {state === "unauthenticated" && (
-          <Info
-            title="Bitte einloggen"
-            body="Zum Ablegen von Rechnungen musst du angemeldet sein."
-          />
+          <div
+            className="mx-auto max-w-md rounded-2xl border p-6 text-center"
+            style={{ backgroundColor: CARD, borderColor: BORDER }}
+          >
+            <p className="text-[17px] font-bold">Bitte einloggen</p>
+            <p className="mt-1.5 text-[15px]" style={{ color: MUTED }}>
+              Zum Ablegen von Rechnungen musst du angemeldet sein.
+            </p>
+            <Link
+              href="/login"
+              className="mt-4 inline-block rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-hover"
+            >
+              Einloggen
+            </Link>
+          </div>
         )}
 
         {state === "no-business" && (
