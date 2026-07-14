@@ -5,12 +5,12 @@ import type { Entry, ExtractionData } from "@/lib/extraction";
 
 /**
  * Standalone "drop everything" zone (demo — no login, no database).
- * Every dropped file runs IN PARALLEL through /api/extract-demo. Successful
- * extractions are reported to the parent via onChange, which rebuilds the
- * income/expense statement live. Deleting a file also updates the statement.
+ * Every dropped file runs IN PARALLEL through /api/extract-demo. Large photos
+ * are downscaled client-side first (faster upload + read). Duplicates are
+ * detected and auto-excluded. Each request has a timeout + retry.
  */
 
-type DropStatus = "queued" | "reading" | "done" | "error";
+type DropStatus = "queued" | "reading" | "done" | "duplicate" | "error";
 
 interface DropFile {
   id: string;
@@ -18,6 +18,44 @@ interface DropFile {
   status: DropStatus;
   error?: string;
   data?: ExtractionData;
+}
+
+const REQUEST_TIMEOUT_MS = 60_000;
+
+/** Key used to spot the same invoice dropped twice. */
+function dedupKey(d: ExtractionData): string {
+  return [
+    d.counterparty?.trim().toLowerCase() ?? "",
+    d.amount,
+    d.document_date ?? "",
+    d.document_ref?.trim().toLowerCase() ?? "",
+  ].join("|");
+}
+
+/** Shrink big images before upload (skips PDFs, HEIC, and already-small ones). */
+async function downscaleImage(file: File, maxDim = 2000, quality = 0.85): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+  if (file.type === "image/heic" || file.type === "image/heif") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    if (scale >= 1) return file; // already small enough
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((r) =>
+      canvas.toBlob(r, "image/jpeg", quality)
+    );
+    if (!blob) return file;
+    return new File([blob], file.name.replace(/\.\w+$/, ".jpg"), {
+      type: "image/jpeg",
+    });
+  } catch {
+    return file; // any failure → send the original
+  }
 }
 
 export default function InvoiceDrop({
@@ -34,7 +72,7 @@ export default function InvoiceDrop({
   const inputRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
 
-  // Report successful entries to the parent whenever the list changes.
+  // Report non-duplicate, successful entries to the parent.
   useEffect(() => {
     if (!onChange) return;
     const entries: Entry[] = files
@@ -49,14 +87,20 @@ export default function InvoiceDrop({
 
   const processOne = useCallback(
     async (item: DropFile) => {
-      patch(item.id, { status: "reading" });
+      patch(item.id, { status: "reading", error: undefined });
+
+      const prepared = await downscaleImage(item.file);
       const form = new FormData();
-      form.append("file", item.file);
+      form.append("file", prepared);
       form.append("key", accessKey);
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       try {
         const res = await fetch("/api/extract-demo", {
           method: "POST",
           body: form,
+          signal: controller.signal,
         });
         if (res.status === 401) {
           patch(item.id, { status: "error", error: "Falsches Passwort" });
@@ -65,13 +109,31 @@ export default function InvoiceDrop({
         }
         const result = await res.json();
         if (!res.ok) throw new Error(result.error || `HTTP ${res.status}`);
-        patch(item.id, { status: "done", data: result.extraction as ExtractionData });
+
+        const data = result.extraction as ExtractionData;
+        // Mark as duplicate if an already-read file has the same key.
+        setFiles((prev) => {
+          const key = dedupKey(data);
+          const isDup = prev.some(
+            (f) => f.id !== item.id && f.status === "done" && f.data && dedupKey(f.data) === key
+          );
+          return prev.map((f) =>
+            f.id === item.id ? { ...f, status: isDup ? "duplicate" : "done", data } : f
+          );
+        });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Extraction failed";
+        const isAbort = err instanceof DOMException && err.name === "AbortError";
+        const msg = isAbort
+          ? "Zeitüberschreitung"
+          : err instanceof Error
+          ? err.message
+          : "Fehler beim Auslesen";
         patch(item.id, { status: "error", error: msg });
+      } finally {
+        clearTimeout(timer);
       }
     },
-    [patch, accessKey, onUnauthorized]
+    [accessKey, onUnauthorized, patch]
   );
 
   const handleFiles = useCallback(
@@ -84,8 +146,18 @@ export default function InvoiceDrop({
         status: "queued",
       }));
       setFiles((prev) => [...prev, ...newItems]);
-      // Fire everything at the extractor in parallel.
-      newItems.forEach((item) => void processOne(item));
+      newItems.forEach((item) => void processOne(item)); // all in parallel
+    },
+    [processOne]
+  );
+
+  const retry = useCallback(
+    (id: string) => {
+      setFiles((prev) => {
+        const item = prev.find((f) => f.id === id);
+        if (item) void processOne(item);
+        return prev;
+      });
     },
     [processOne]
   );
@@ -118,6 +190,7 @@ export default function InvoiceDrop({
   };
 
   const busy = files.some((f) => f.status === "reading");
+  const dupes = files.filter((f) => f.status === "duplicate").length;
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -161,6 +234,7 @@ export default function InvoiceDrop({
           <div className="mb-2 mt-4 flex items-center justify-between px-1">
             <span className="text-xs text-zinc-400">
               {files.length} {files.length === 1 ? "Datei" : "Dateien"}
+              {dupes > 0 && ` · ${dupes} Duplikat${dupes === 1 ? "" : "e"} übersprungen`}
             </span>
             <button
               onClick={clearAll}
@@ -173,7 +247,12 @@ export default function InvoiceDrop({
             {files.map((f) => (
               <li
                 key={f.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm"
+                className={[
+                  "flex items-center justify-between gap-3 rounded-lg border px-4 py-2.5 text-sm",
+                  f.status === "duplicate"
+                    ? "border-zinc-200 bg-zinc-50 opacity-60"
+                    : "border-zinc-200 bg-white",
+                ].join(" ")}
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-zinc-700">{f.file.name}</p>
@@ -191,6 +270,16 @@ export default function InvoiceDrop({
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <StatusBadge status={f.status} error={f.error} />
+                  {f.status === "error" && (
+                    <button
+                      onClick={() => retry(f.id)}
+                      title="Erneut versuchen"
+                      aria-label={`${f.file.name} erneut versuchen`}
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-brand"
+                    >
+                      ↻
+                    </button>
+                  )}
                   <button
                     onClick={() => removeFile(f.id)}
                     aria-label={`${f.file.name} entfernen`}
@@ -218,6 +307,7 @@ function StatusBadge({ status, error }: { status: DropStatus; error?: string }) 
     queued: { label: "Queued", className: "text-zinc-400" },
     reading: { label: "Liest …", className: "text-brand" },
     done: { label: "Erledigt", className: "text-green-600" },
+    duplicate: { label: "Duplikat", className: "text-amber-600" },
     error: { label: error || "Fehler", className: "text-red-600" },
   };
   const { label, className } = map[status];
