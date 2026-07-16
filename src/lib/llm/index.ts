@@ -10,7 +10,8 @@ export function getLLMProvider(): LLMProvider {
     case "gemini": {
       const key = process.env.GOOGLE_GEMINI_API_KEY;
       if (!key) throw new Error("GOOGLE_GEMINI_API_KEY not set");
-      return new GeminiProvider(key);
+      // GEMINI_MODEL lets you switch models without a code change.
+      return new GeminiProvider(key, process.env.GEMINI_MODEL);
     }
     // case "anthropic": {
     //   const key = process.env.ANTHROPIC_API_KEY;

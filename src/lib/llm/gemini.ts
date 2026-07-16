@@ -6,7 +6,7 @@ export class GeminiProvider implements LLMProvider {
   private apiKey: string;
   private model: string;
 
-  constructor(apiKey: string, model = "gemini-2.5-flash") {
+  constructor(apiKey: string, model = "gemini-flash-latest") {
     this.apiKey = apiKey;
     this.model = model;
   }
