@@ -12,7 +12,13 @@ import {
   type ReactNode,
 } from "react";
 
-import type { AppHustle, AppProfile, AppTransaction, Database } from "@/lib/database.types";
+import type {
+  AccessRole,
+  AppHustle,
+  AppProfile,
+  AppTransaction,
+  Database,
+} from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -26,7 +32,18 @@ import { createClient } from "@/lib/supabase/client";
  */
 
 type AppDataValue = {
+  /** Who is signed in. */
   userId: string;
+  /**
+   * Whose books are on screen. Equals userId for your own; differs when you're
+   * looking at books shared with you. Every read and write is keyed to THIS,
+   * not to userId — mixing the two is how a Treuhänder's scan would land in
+   * their own books instead of their client's.
+   */
+  ownerId: string;
+  role: AccessRole;
+  /** Viewers get a read-only UI; RLS enforces it regardless. */
+  canWrite: boolean;
   profile: AppProfile | null;
   hustles: AppHustle[];
   transactions: AppTransaction[];
@@ -55,17 +72,22 @@ function byDateDesc(a: AppTransaction, b: AppTransaction) {
 
 export function AppDataProvider({
   userId,
+  ownerId,
+  role,
   initialProfile,
   initialHustles,
   initialTransactions,
   children,
 }: {
   userId: string;
+  ownerId: string;
+  role: AccessRole;
   initialProfile: AppProfile | null;
   initialHustles: AppHustle[];
   initialTransactions: AppTransaction[];
   children: ReactNode;
 }) {
+  const canWrite = role !== "viewer";
   const [supabase] = useState<SupabaseClient<Database>>(() => createClient());
   const [profile, setProfile] = useState<AppProfile | null>(initialProfile);
   const [hustles, setHustles] = useState<AppHustle[]>(initialHustles);
@@ -97,10 +119,10 @@ export function AppDataProvider({
   // ---- Realtime -----------------------------------------------------------
   useEffect(() => {
     const channel = supabase
-      .channel(`app-data-${userId}`)
+      .channel(`app-data-${ownerId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "app_transactions", filter: `user_id=eq.${userId}` },
+        { event: "*", schema: "public", table: "app_transactions", filter: `user_id=eq.${ownerId}` },
         (payload: RealtimePostgresChangesPayload<AppTransaction>) => {
           if (payload.eventType === "DELETE") {
             const gone = payload.old as AppTransaction;
@@ -125,7 +147,7 @@ export function AppDataProvider({
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "app_hustles", filter: `user_id=eq.${userId}` },
+        { event: "*", schema: "public", table: "app_hustles", filter: `user_id=eq.${ownerId}` },
         (payload: RealtimePostgresChangesPayload<AppHustle>) => {
           if (payload.eventType === "DELETE") {
             const gone = payload.old as AppHustle;
@@ -147,7 +169,7 @@ export function AppDataProvider({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, userId, markFresh]);
+  }, [supabase, ownerId, markFresh]);
 
   // ---- Mutations ----------------------------------------------------------
   // Each one writes through to Postgres and updates local state optimistically,
@@ -159,18 +181,18 @@ export function AppDataProvider({
       const { error } = await supabase
         .from("app_profiles")
         .upsert(
-          { user_id: userId, ...patch, updated_at: new Date().toISOString() },
+          { user_id: ownerId, ...patch, updated_at: new Date().toISOString() },
           { onConflict: "user_id" },
         );
       if (error) throw new Error(error.message);
     },
-    [supabase, userId],
+    [supabase, ownerId],
   );
 
   const saveHustles = useCallback(
     async (next: { id: string; name: string; color: string }[]) => {
       const rows = next.map((h) => ({
-        user_id: userId,
+        user_id: ownerId,
         id: h.id,
         name: h.name,
         color: h.color,
@@ -183,7 +205,7 @@ export function AppDataProvider({
         .upsert(rows, { onConflict: "user_id,id" });
       if (error) throw new Error(error.message);
     },
-    [supabase, userId],
+    [supabase, ownerId],
   );
 
   const addTransaction = useCallback(
@@ -210,13 +232,13 @@ export function AppDataProvider({
         .from("app_transactions")
         .update({ ...patch, updated_at: new Date().toISOString() })
         .eq("id", id)
-        .eq("user_id", userId);
+        .eq("user_id", ownerId);
       if (error) {
         if (before) setTransactions((prev) => prev.map((t) => (t.id === id ? before : t)));
         throw new Error(error.message);
       }
     },
-    [supabase, userId, transactions],
+    [supabase, ownerId, transactions],
   );
 
   const removeTransaction = useCallback(
@@ -227,7 +249,7 @@ export function AppDataProvider({
         .from("app_transactions")
         .delete()
         .eq("id", id)
-        .eq("user_id", userId);
+        .eq("user_id", ownerId);
       if (error) {
         if (before) setTransactions((prev) => [before, ...prev].sort(byDateDesc));
         throw new Error(error.message);
@@ -238,12 +260,15 @@ export function AppDataProvider({
         await supabase.storage.from("receipts").remove([before.image_path]);
       }
     },
-    [supabase, userId, transactions],
+    [supabase, ownerId, transactions],
   );
 
   const value = useMemo<AppDataValue>(
     () => ({
       userId,
+      ownerId,
+      role,
+      canWrite,
       profile,
       hustles,
       transactions,
@@ -257,6 +282,9 @@ export function AppDataProvider({
     }),
     [
       userId,
+      ownerId,
+      role,
+      canWrite,
       profile,
       hustles,
       transactions,

@@ -1,3 +1,10 @@
+/**
+ * What someone can do with books that aren't theirs.
+ * `owner` isn't stored — it's what you are when the books are your own.
+ */
+export type ShareRole = "editor" | "viewer";
+export type AccessRole = "owner" | ShareRole;
+
 /** Row returned by consume_extraction() / the shape the 402 body is built from. */
 export type QuotaGateRow = {
   allowed: boolean;
@@ -41,6 +48,14 @@ export type Database = {
       consume_demo_extraction: {
         Args: { p_cap: number };
         Returns: { allowed: boolean; used: number; cap: number }[];
+      };
+      accept_share: {
+        Args: { p_token: string };
+        Returns: { ok: boolean; owner_user_id: string | null; message: string }[];
+      };
+      shared_books: {
+        Args: Record<PropertyKey, never>;
+        Returns: { owner_user_id: string; owner_name: string; role: ShareRole }[];
       };
     };
 
@@ -296,6 +311,44 @@ export type Database = {
         };
         Relationships: [];
       };
+      // Shared access — see supabase/sharing_setup.sql.
+      app_shares: {
+        Row: {
+          id: string;
+          owner_user_id: string;
+          member_user_id: string | null;
+          invite_email: string;
+          role: ShareRole;
+          status: "pending" | "accepted" | "revoked";
+          token: string;
+          created_at: string;
+          accepted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          owner_user_id: string;
+          member_user_id?: string | null;
+          invite_email: string;
+          role: ShareRole;
+          status?: "pending" | "accepted" | "revoked";
+          token?: string;
+          created_at?: string;
+          accepted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          owner_user_id?: string;
+          member_user_id?: string | null;
+          invite_email?: string;
+          role?: ShareRole;
+          status?: "pending" | "accepted" | "revoked";
+          token?: string;
+          created_at?: string;
+          accepted_at?: string | null;
+        };
+        Relationships: [];
+      };
+
       // Customer-toggleable modules — see supabase/modules_setup.sql.
       // Secrets live in app_integration_secrets (service-role only) and are
       // deliberately kept out of anything the browser can read.

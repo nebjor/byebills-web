@@ -54,7 +54,8 @@ async function downscale(file: File, maxDim = 2000, quality = 0.85): Promise<Fil
 }
 
 export default function Scan() {
-  const { profile, hustles, addTransaction, userId, saveHustles } = useAppData();
+  const { profile, hustles, addTransaction, ownerId, saveHustles, canWrite, role } =
+    useAppData();
   const currency = profile?.currency ?? "CHF";
 
   const [items, setItems] = useState<Item[]>([]);
@@ -162,7 +163,10 @@ export default function Scan() {
 
       // Upload the receipt photo first; a failure here must not lose the entry.
       if (item.file.type.startsWith("image/")) {
-        const path = `${userId}/${txId}.jpg`;
+        // Receipts live under the OWNER's folder — that's what the storage
+        // policy checks, and what makes the image visible to everyone who can
+        // read these books.
+        const path = `${ownerId}/${txId}.jpg`;
         const prepared = await downscale(item.file);
         const { error } = await supabase.storage
           .from("receipts")
@@ -173,7 +177,7 @@ export default function Scan() {
       try {
         await addTransaction(
           extractionToRow(item.data as ExtractionData, {
-            userId,
+            userId: ownerId,
             hustleId: item.hustleId || hustleId,
             id: txId,
             imagePath,
@@ -192,6 +196,25 @@ export default function Scan() {
 
   const readyCount = items.filter((i) => i.status === "ready").length;
   const busyCount = items.filter((i) => i.status === "queued" || i.status === "reading").length;
+
+  // A viewer (accountant, club auditor) can read the books but not add to them.
+  // RLS would reject the insert anyway; refusing here avoids burning a scan on
+  // an extraction that could never be saved.
+  if (!canWrite) {
+    return (
+      <div className="px-5 pt-8">
+        <header>
+          <h1 className="text-[30px] font-extrabold tracking-[-0.5px]">Scan</h1>
+        </header>
+        <Card className="mt-6">
+          <p className="font-bold">You have read-only access to these books</p>
+          <p className="mt-1.5 text-sm text-[var(--bb-ink-600)]">
+            Ask the owner for edit access, or switch back to your own books to scan.
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="px-5 pt-8">

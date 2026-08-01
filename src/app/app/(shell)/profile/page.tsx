@@ -138,21 +138,37 @@ export default function ProfilePage() {
         </Card>
       </section>
 
-      {/* Modules */}
+      {/* Sharing & modules */}
       <section className="mt-7">
-        <h2 className="text-lg font-extrabold">Modules</h2>
+        <h2 className="text-lg font-extrabold">Your books</h2>
         <Card className="mt-3">
-          <Link href="/app/modules" className="flex items-center justify-between gap-3">
-            <span>
-              <span className="block font-bold">Connections &amp; imports</span>
-              <span className="mt-0.5 block text-sm text-[var(--bb-ink-600)]">
-                Connect a shop, mirror to a spreadsheet, share with your accountant.
+          <div className="flex flex-col gap-4">
+            <Link href="/app/people" className="flex items-center justify-between gap-3">
+              <span>
+                <span className="block font-bold">People with access</span>
+                <span className="mt-0.5 block text-sm text-[var(--bb-ink-600)]">
+                  Invite your accountant, a partner, or your club&apos;s auditors.
+                </span>
               </span>
-            </span>
-            <span aria-hidden className="text-xl text-[var(--bb-ink-400)]">
-              ›
-            </span>
-          </Link>
+              <span aria-hidden className="text-xl text-[var(--bb-ink-400)]">
+                ›
+              </span>
+            </Link>
+
+            <div className="h-px bg-[var(--bb-divider)]" />
+
+            <Link href="/app/modules" className="flex items-center justify-between gap-3">
+              <span>
+                <span className="block font-bold">Connections &amp; imports</span>
+                <span className="mt-0.5 block text-sm text-[var(--bb-ink-600)]">
+                  Connect a shop or mirror to a spreadsheet.
+                </span>
+              </span>
+              <span aria-hidden className="text-xl text-[var(--bb-ink-400)]">
+                ›
+              </span>
+            </Link>
+          </div>
         </Card>
       </section>
 
