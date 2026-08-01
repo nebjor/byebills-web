@@ -296,6 +296,68 @@ export type Database = {
         };
         Relationships: [];
       };
+      // Customer-toggleable modules — see supabase/modules_setup.sql.
+      // Secrets live in app_integration_secrets (service-role only) and are
+      // deliberately kept out of anything the browser can read.
+      app_integrations: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          hustle_id: string | null;
+          active: boolean;
+          config: Record<string, string>;
+          status: string;
+          last_sync_at: string | null;
+          last_error: string | null;
+          cursor: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: string;
+          hustle_id?: string | null;
+          active?: boolean;
+          config?: Record<string, string>;
+          status?: string;
+          last_sync_at?: string | null;
+          last_error?: string | null;
+          cursor?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: string;
+          hustle_id?: string | null;
+          active?: boolean;
+          config?: Record<string, string>;
+          status?: string;
+          last_sync_at?: string | null;
+          last_error?: string | null;
+          cursor?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      app_integration_secrets: {
+        Row: { integration_id: string; secrets: Record<string, string>; updated_at: string };
+        Insert: {
+          integration_id: string;
+          secrets?: Record<string, string>;
+          updated_at?: string;
+        };
+        Update: {
+          integration_id?: string;
+          secrets?: Record<string, string>;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       app_transactions: {
         Row: {
           user_id: string;

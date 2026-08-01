@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -134,6 +135,24 @@ export default function ProfilePage() {
               Add
             </Button>
           </div>
+        </Card>
+      </section>
+
+      {/* Modules */}
+      <section className="mt-7">
+        <h2 className="text-lg font-extrabold">Modules</h2>
+        <Card className="mt-3">
+          <Link href="/app/modules" className="flex items-center justify-between gap-3">
+            <span>
+              <span className="block font-bold">Connections &amp; imports</span>
+              <span className="mt-0.5 block text-sm text-[var(--bb-ink-600)]">
+                Connect a shop, mirror to a spreadsheet, share with your accountant.
+              </span>
+            </span>
+            <span aria-hidden className="text-xl text-[var(--bb-ink-400)]">
+              ›
+            </span>
+          </Link>
         </Card>
       </section>
 
