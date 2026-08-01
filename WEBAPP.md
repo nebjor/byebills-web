@@ -35,7 +35,13 @@ In the Supabase SQL editor, in order (all idempotent, safe to re-run):
 supabase/app_data_setup.sql    -- app_hustles, app_transactions, receipts bucket
 supabase/trial_quota_setup.sql -- entitlements + consume_extraction()
 supabase/webapp_setup.sql      -- app_profiles, realtime publication, demo cap
+supabase/sharing_setup.sql     -- app_shares + widened RLS  (run BEFORE modules)
+supabase/modules_setup.sql     -- app_integrations + secrets + run log
 ```
+
+`sharing_setup.sql` **replaces** the per-table `own …` policies with read/write
+pairs. Run it before `modules_setup.sql`, and re-run it if you ever re-run
+`app_data_setup.sql` (which would restore the narrower policies).
 
 `webapp_setup.sql` is new. It adds:
 - `app_profiles` (+ a signup trigger that prefills the name from the OAuth
@@ -83,6 +89,9 @@ New, optional:
 | `/app/scan` | Drop zone — parallel extraction, review, save |
 | `/app/reports` | Monthly + per-hustle totals, CSV export |
 | `/app/profile` | Name, currency, hustles, dark mode, sign out |
+| `/app/people` | Invite an accountant / partner / auditor; open books shared with you |
+| `/app/join/[token]` | Accept an invite |
+| `/app/modules` | Switch connections on and off |
 | `/auth/callback` | OAuth code exchange |
 
 `src/middleware.ts` is scoped to `/app/:path*` **only**. The landing page,
@@ -106,6 +115,80 @@ called Gemini with no ceiling at all.
 All of them **reserve before** spending and **refund on failure**, so our errors
 never cost a user a scan. The rules live in Postgres, not the app, so no client
 can bypass them.
+
+---
+
+---
+
+## Shared access
+
+Three roles. `owner` isn't stored — it's what you are for your own books.
+
+| Role | Can |
+| --- | --- |
+| owner | everything, including inviting people and connecting modules |
+| editor | read + scan + edit entries (partner, co-founder) |
+| viewer | read only (Treuhänder, club Revisor) |
+
+Books stay keyed to the owner's `user_id`; the RLS policies widen rather than a
+workspace id being introduced. That keeps the mobile app working untouched and
+avoids migrating every existing row.
+
+Invites are **email-bound**: `accept_share()` requires the signed-in email to
+match the invited address, so a forwarded link can't hand over someone's
+financial records. There's no invite email yet — the owner copies the link from
+`/app/people` and sends it themselves.
+
+`?books=<owner_id>` switches which books are on screen. A forged value falls
+back to your own books, because RLS returns nothing for an owner you have no
+share with.
+
+---
+
+## Modules
+
+Customers switch these on themselves at `/app/modules`.
+
+| Module | Direction | Status |
+| --- | --- | --- |
+| Stripe payouts | in | live |
+| Shopify | in | live |
+| WooCommerce · Medusa | in | declared, no connector yet |
+| Google Sheets · Accountant access | out | declared, no connector yet |
+
+**Credentials never reach the browser.** `app_integrations.config` is
+client-readable under RLS, so API keys go to `app_integration_secrets` — RLS on,
+deliberately *no policies*, service-role only — written via `/api/app/modules`.
+
+**The accounting model:** connectors import **payouts, not orders**. One
+settlement becomes two entries — gross takings as income, platform fees as an
+expense — which nets to the figure on the bank statement. A shop doing 500
+orders a month would otherwise put 500 rows in a ledger meant to be read by a
+human.
+
+**Idempotency:** `app_transactions.id` is derived from the source event
+(`stripe:po_1abc`), so a re-run or a replayed webhook collides on the primary
+key instead of double-booking income. Imports use `ignoreDuplicates` so an
+entry the user has since edited isn't overwritten.
+
+Imports are currently **manual** — "Import now" on the settings screen. Putting
+them on a schedule means pointing a Vercel cron at `/api/app/modules/sync` and
+adding a service-to-service auth check; the route today authenticates a signed-in
+owner.
+
+### Stripe setup
+
+Create a **restricted key** (Developers → API keys → restricted) with read
+access to **Payouts** and **Balance transactions**. Nothing else is needed.
+Works whatever the shop is built on — Shopify, Woo, Medusa or custom — as long
+as it settles through Stripe.
+
+### Shopify setup
+
+Create a custom app in the Shopify admin with the
+`read_shopify_payments_payouts` scope and paste the Admin API access token. Only
+useful if the shop uses **Shopify Payments**; if it settles via Stripe, use the
+Stripe module instead.
 
 ---
 

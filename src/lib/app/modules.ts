@@ -48,14 +48,14 @@ export const MODULES: ModuleDef[] = [
       "Books each Stripe payout as income and the fees as an expense — the amounts that actually hit your bank.",
     direction: "in",
     category: "payments",
-    status: "soon",
+    status: "live",
     tier: "basic",
     fields: [
       {
         key: "restricted_key",
         label: "Stripe restricted key",
         placeholder: "rk_live_…",
-        hint: "Read-only key with the Balance transaction and Payout permissions.",
+        hint: "A restricted key with read access to Payouts and Balance transactions.",
         secret: true,
         required: true,
       },
@@ -71,7 +71,7 @@ export const MODULES: ModuleDef[] = [
     blurb: "Imports your Shopify payouts and platform fees automatically.",
     direction: "in",
     category: "shop",
-    status: "soon",
+    status: "live",
     tier: "basic",
     fields: [
       {
@@ -80,9 +80,24 @@ export const MODULES: ModuleDef[] = [
         placeholder: "my-store.myshopify.com",
         required: true,
       },
-      { key: "access_token", label: "Admin API access token", secret: true, required: true },
+      {
+        key: "access_token",
+        label: "Admin API access token",
+        hint: "Custom app token with the read_shopify_payments_payouts scope.",
+        secret: true,
+        required: true,
+      },
+      {
+        key: "api_version",
+        label: "API version (optional)",
+        placeholder: "2024-10",
+        hint: "Leave blank unless Shopify has asked you to change it.",
+      },
     ],
-    notes: ["Payout-level, so a busy month stays readable."],
+    notes: [
+      "Payout-level, so a busy month stays readable.",
+      "If your shop settles through Stripe rather than Shopify Payments, use the Stripe module instead.",
+    ],
   },
   {
     type: "woocommerce",

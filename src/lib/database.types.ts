@@ -397,6 +397,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      app_integration_runs: {
+        Row: {
+          id: string;
+          integration_id: string;
+          user_id: string;
+          started_at: string;
+          finished_at: string | null;
+          ok: boolean | null;
+          imported: number;
+          message: string | null;
+        };
+        Insert: {
+          id?: string;
+          integration_id: string;
+          user_id: string;
+          started_at?: string;
+          finished_at?: string | null;
+          ok?: boolean | null;
+          imported?: number;
+          message?: string | null;
+        };
+        Update: {
+          id?: string;
+          integration_id?: string;
+          user_id?: string;
+          started_at?: string;
+          finished_at?: string | null;
+          ok?: boolean | null;
+          imported?: number;
+          message?: string | null;
+        };
+        Relationships: [];
+      };
       app_integration_secrets: {
         Row: { integration_id: string; secrets: Record<string, string>; updated_at: string };
         Insert: {

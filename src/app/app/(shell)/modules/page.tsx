@@ -31,6 +31,10 @@ export default function ModulesPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [openType, setOpenType] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const [syncNote, setSyncNote] = useState<{ id: string; ok: boolean; text: string } | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -66,6 +70,37 @@ export default function ModulesPage() {
       .update({ active: on, updated_at: new Date().toISOString() })
       .eq("id", existing.id)
       .eq("user_id", userId);
+  }
+
+  async function runImport(integrationId: string) {
+    setSyncing(integrationId);
+    setSyncNote(null);
+    try {
+      const res = await fetch("/api/app/modules/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ integration_id: integrationId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+
+      setSyncNote({
+        id: integrationId,
+        ok: true,
+        text: body.imported
+          ? `Added ${body.imported} ${body.imported === 1 ? "entry" : "entries"}`
+          : "Nothing new",
+      });
+      await load();
+    } catch (e) {
+      setSyncNote({
+        id: integrationId,
+        ok: false,
+        text: e instanceof Error ? e.message : "Import failed",
+      });
+    } finally {
+      setSyncing(null);
+    }
   }
 
   const grouped = {
@@ -176,13 +211,38 @@ export default function ModulesPage() {
                 )}
 
                 {!editing && row && (
-                  <button
-                    type="button"
-                    onClick={() => setOpenType(def.type)}
-                    className="mt-3 text-sm font-bold text-[var(--bb-brand)] hover:underline"
-                  >
-                    Settings
-                  </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setOpenType(def.type)}
+                      className="text-sm font-bold text-[var(--bb-brand)] hover:underline"
+                    >
+                      Settings
+                    </button>
+
+                    {def.direction === "in" && on && (
+                      <button
+                        type="button"
+                        disabled={syncing === row.id}
+                        onClick={() => runImport(row.id)}
+                        className="text-sm font-bold text-[var(--bb-brand)] hover:underline disabled:opacity-50"
+                      >
+                        {syncing === row.id ? "Importing …" : "Import now"}
+                      </button>
+                    )}
+
+                    {syncNote?.id === row.id && (
+                      <span
+                        className={`text-sm font-bold ${
+                          syncNote.ok
+                            ? "text-[var(--bb-brand-ink)]"
+                            : "text-[var(--bb-err-ink)]"
+                        }`}
+                      >
+                        {syncNote.text}
+                      </span>
+                    )}
+                  </div>
                 )}
               </Card>
             );
