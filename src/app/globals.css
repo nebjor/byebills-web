@@ -35,3 +35,141 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ==========================================================================
+   byeBills web app (/app) — design tokens ported 1:1 from the mobile theme
+   (byebills-app/src/theme/index.tsx) so the two clients look like one product.
+
+   Everything is scoped under .bb-app. The marketing site and /drop demo keep
+   their own warm palette and are deliberately untouched by anything here.
+   ========================================================================== */
+.bb-app {
+  --bb-brand: #15a95e;
+  --bb-brand-pressed: #0f8a4c;
+  --bb-brand-tint: #e6f6ec;
+  --bb-brand-ink: #0c6b3b;
+  --bb-on-brand: #ffffff;
+
+  --bb-purple: #7a5af8;
+  --bb-purple-tint: #ece9fe;
+  --bb-purple-ink: #4b2fc4;
+
+  --bb-ink: #14201a;
+  --bb-ink-600: #5b6b63;
+  --bb-ink-400: #9aa6a0;
+
+  --bb-surface: #ffffff;
+  --bb-canvas: #f5f7f6;
+  --bb-cream: #fbf7ee;
+  --bb-border: #e4e9e6;
+  --bb-divider: #eef2f0;
+
+  --bb-success: #15a95e;
+  --bb-warning: #f5a524;
+  --bb-error: #e5484d;
+  --bb-info: #3b82f6;
+
+  --bb-success-tint: #e6f6ec;
+  --bb-warning-tint: #fdf1dc;
+  --bb-error-tint: #fce9e9;
+  --bb-warn-ink: #9a6300;
+  --bb-err-ink: #b42318;
+
+  --bb-track: #e9edea;
+  --bb-subtle: #f1f4f2;
+  --bb-selected-tint: #f2fbf6;
+  --bb-control-border: #cdd5d0;
+
+  --bb-shadow: 0 1px 2px rgb(20 32 26 / 0.04), 0 8px 24px -12px rgb(20 32 26 / 0.12);
+
+  background-color: var(--bb-canvas);
+  color: var(--bb-ink);
+  font-family: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.bb-app[data-theme="dark"] {
+  --bb-brand: #2fd27e;
+  --bb-brand-pressed: #28b86c;
+  --bb-brand-tint: #16321f;
+  --bb-brand-ink: #7be3ac;
+  --bb-on-brand: #06210f;
+
+  --bb-purple: #9b82ff;
+  --bb-purple-tint: #241e4d;
+  --bb-purple-ink: #c9bcff;
+
+  --bb-ink: #f4f7f5;
+  --bb-ink-600: #a6b2ac;
+  --bb-ink-400: #6e7c76;
+
+  --bb-surface: #131c30;
+  --bb-canvas: #0a0f1c;
+  --bb-cream: #131c30;
+  --bb-border: #243049;
+  --bb-divider: #1c2740;
+
+  --bb-success: #2fd27e;
+  --bb-warning: #f5b544;
+  --bb-error: #ff6b6b;
+  --bb-info: #5aa2ff;
+
+  --bb-success-tint: #16321f;
+  --bb-warning-tint: #2e2410;
+  --bb-error-tint: #3a1c20;
+  --bb-warn-ink: #f5c97a;
+  --bb-err-ink: #ff9b9b;
+
+  --bb-track: #222c44;
+  --bb-subtle: #1c2740;
+  --bb-selected-tint: #16321f;
+  --bb-control-border: #3a465c;
+
+  --bb-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+}
+
+/* Respect the phone's safe area so the tab bar clears the home indicator. */
+.bb-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@keyframes bb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* New rows arriving over realtime announce themselves rather than just appearing. */
+@keyframes bb-pop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(0) scale(1.01);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.bb-rise {
+  animation: bb-rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.bb-pop-in {
+  animation: bb-pop-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bb-rise,
+  .bb-pop-in {
+    animation: none;
+  }
+}

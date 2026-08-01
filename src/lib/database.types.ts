@@ -1,5 +1,49 @@
+/** Row returned by consume_extraction() / the shape the 402 body is built from. */
+export type QuotaGateRow = {
+  allowed: boolean;
+  used: number;
+  cap: number;
+  reason: string;
+};
+
 export type Database = {
   public: {
+    // NOTE: these must be EMPTY key maps, not Record<string, never> — the
+    // latter claims every possible name is a View, which shadows the real
+    // tables and resolves them all to `never`.
+    Views: { [_ in never]: never };
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
+
+    // Postgres functions (supabase/trial_quota_setup.sql, webapp_setup.sql).
+    // supabase-js needs these declared or .rpc() is untyped — and without the
+    // Views/Functions/Enums keys present at all, it resolves every table to
+    // `never`, which is what forced the `as any` casts elsewhere in this repo.
+    Functions: {
+      consume_extraction: {
+        Args: Record<PropertyKey, never>;
+        Returns: QuotaGateRow[];
+      };
+      refund_extraction: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
+      extraction_status: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          status: string;
+          trial_days_left: number;
+          used_today: number;
+          daily_cap: number;
+          remaining_today: number;
+        }[];
+      };
+      consume_demo_extraction: {
+        Args: { p_cap: number };
+        Returns: { allowed: boolean; used: number; cap: number }[];
+      };
+    };
+
     Tables: {
       users: {
         Row: {
@@ -20,6 +64,7 @@ export type Database = {
           full_name?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       businesses: {
         Row: {
@@ -52,6 +97,7 @@ export type Database = {
           archived?: boolean;
           created_at?: string;
         };
+        Relationships: [];
       };
       integrations: {
         Row: {
@@ -78,6 +124,7 @@ export type Database = {
           active?: boolean;
           created_at?: string;
         };
+        Relationships: [];
       };
       transactions: {
         Row: {
@@ -143,6 +190,7 @@ export type Database = {
           raw_extraction?: Record<string, unknown> | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       documents: {
         Row: {
@@ -166,6 +214,7 @@ export type Database = {
           file_type?: "image" | "pdf" | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       sync_log: {
         Row: {
@@ -192,6 +241,101 @@ export type Database = {
           status?: "success" | "failed" | null;
           error?: string | null;
         };
+        Relationships: [];
+      };
+
+      // ---- Cross-platform app tables (see supabase/app_data_setup.sql and
+      // supabase/webapp_setup.sql). These are the tables the mobile app and the
+      // hidden web app SHARE — same rows, same auth.uid(). The v1 tables above
+      // (businesses/transactions/…) are the older web-only model.
+      app_profiles: {
+        Row: {
+          user_id: string;
+          name: string;
+          currency: string;
+          onboarded_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          name?: string;
+          currency?: string;
+          onboarded_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          name?: string;
+          currency?: string;
+          onboarded_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      app_hustles: {
+        Row: {
+          user_id: string;
+          id: string;
+          name: string;
+          color: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          id: string;
+          name: string;
+          color?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          id?: string;
+          name?: string;
+          color?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      app_transactions: {
+        Row: {
+          user_id: string;
+          id: string;
+          title: string;
+          meta: string;
+          /** Signed: positive = income, negative = expense (mobile's shape). */
+          amount: number;
+          status: string;
+          hustle_id: string;
+          date: string;
+          /** Storage object path in the private `receipts` bucket. */
+          image_path: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          id: string;
+          title?: string;
+          meta?: string;
+          amount?: number;
+          status?: string;
+          hustle_id?: string;
+          date: string;
+          image_path?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          id?: string;
+          title?: string;
+          meta?: string;
+          amount?: number;
+          status?: string;
+          hustle_id?: string;
+          date?: string;
+          image_path?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
     };
   };
@@ -204,3 +348,8 @@ export type Business = Database["public"]["Tables"]["businesses"]["Row"];
 export type Integration = Database["public"]["Tables"]["integrations"]["Row"];
 export type Document = Database["public"]["Tables"]["documents"]["Row"];
 export type SyncLog = Database["public"]["Tables"]["sync_log"]["Row"];
+
+// Cross-platform app aliases
+export type AppProfile = Database["public"]["Tables"]["app_profiles"]["Row"];
+export type AppHustle = Database["public"]["Tables"]["app_hustles"]["Row"];
+export type AppTransaction = Database["public"]["Tables"]["app_transactions"]["Row"];

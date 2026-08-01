@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getLLMProvider } from "@/lib/llm";
 import { getPostHogClient } from "@/lib/posthog-server";
+import { consumeExtraction, quotaDeniedBody, refundExtraction } from "@/lib/quota";
 import crypto from "crypto";
+
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +51,14 @@ async function handleExtract(request: NextRequest) {
     return NextResponse.json({ error: "Business not found" }, { status: 404 });
   }
 
+  // Reserve one scan BEFORE spending any Gemini tokens. Same trial + daily cap
+  // the mobile app is held to — previously this path was unmetered, so a web
+  // user had unlimited scans even after their trial ended.
+  const gate = await consumeExtraction(supabase);
+  if (!gate.allowed) {
+    return NextResponse.json(quotaDeniedBody(gate), { status: 402 });
+  }
+
   // Convert file to base64
   const bytes = await file.arrayBuffer();
   const base64 = Buffer.from(bytes).toString("base64");
@@ -61,6 +72,8 @@ async function handleExtract(request: NextRequest) {
     providerName = provider.name;
     extraction = await provider.extractInvoice(base64, mimeType);
   } catch (err) {
+    // Our failure must not cost the user a scan.
+    await refundExtraction(supabase);
     const msg = err instanceof Error ? err.message : "LLM extraction failed";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
