@@ -232,6 +232,11 @@ export function AppDataProvider({
         if (before) setTransactions((prev) => [before, ...prev].sort(byDateDesc));
         throw new Error(error.message);
       }
+      // Drop the receipt image too, so we don't pay to store orphans. Mobile's
+      // delete path does the same. Best-effort: the row is already gone.
+      if (before?.image_path) {
+        await supabase.storage.from("receipts").remove([before.image_path]);
+      }
     },
     [supabase, userId, transactions],
   );
