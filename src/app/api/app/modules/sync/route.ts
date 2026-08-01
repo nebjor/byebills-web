@@ -104,13 +104,20 @@ export async function POST(request: NextRequest) {
     let imported = 0;
     if (rows.length) {
       // ignoreDuplicates: an already-imported payout must not be overwritten —
-      // the user may have edited its category since.
-      const { error: insertError, count } = await admin
+      // the user may have recategorised it since.
+      //
+      // .select() is required, not cosmetic: PostgREST only returns rows (and a
+      // count) when a representation is requested. Without it the response is
+      // empty and every import reports "Nothing new". With ON CONFLICT DO
+      // NOTHING only the genuinely-new rows come back, which is the number we
+      // want.
+      const { data: inserted, error: insertError } = await admin
         .from("app_transactions")
-        .upsert(rows, { onConflict: "user_id,id", ignoreDuplicates: true, count: "exact" });
+        .upsert(rows, { onConflict: "user_id,id", ignoreDuplicates: true })
+        .select("id");
 
       if (insertError) throw new Error(insertError.message);
-      imported = count ?? 0;
+      imported = inserted?.length ?? 0;
     }
 
     await admin

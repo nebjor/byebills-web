@@ -38,11 +38,18 @@ create table if not exists public.app_integrations (
   cursor       text,                            -- resume point (e.g. last payout id)
 
   created_at   timestamptz not null default now(),
-  updated_at   timestamptz not null default now(),
-
-  -- One connection per module per hustle.
-  unique (user_id, type, hustle_id)
+  updated_at   timestamptz not null default now()
 );
+
+-- One connection per module per hustle.
+--
+-- This CANNOT be a plain `unique (user_id, type, hustle_id)`: hustle_id is
+-- nullable and Postgres treats NULLs as distinct in unique constraints, so
+-- every reconnect with a null hustle would insert another row instead of
+-- updating — leaving duplicates, an arbitrary one shown in the UI, and the
+-- credentials attached to whichever was newest. coalesce() collapses that.
+create unique index if not exists app_integrations_unique_idx
+  on public.app_integrations (user_id, type, coalesce(hustle_id, '*'));
 
 create index if not exists app_integrations_user_idx
   on public.app_integrations (user_id, active);

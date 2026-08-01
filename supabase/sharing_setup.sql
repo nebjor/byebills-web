@@ -148,21 +148,55 @@ create policy "write profile" on public.app_profiles
 -- that is not a decision a shared editor gets to make.
 
 -- ---- Receipt images ---------------------------------------------------------
--- Objects live at "<owner_user_id>/<tx_id>.jpg". A member needs to see the
--- image behind a transaction they can already read, so the SELECT policy
--- follows the same predicate. Writes stay in the caller's own folder.
-drop policy if exists "receipts read own" on storage.objects;
+-- Objects live at "<owner_user_id>/<tx_id>.jpg" — the OWNER's folder, not the
+-- uploader's, so that everyone who can read the books can see the image.
+--
+-- That means the write policies have to move too. The originals in
+-- app_data_setup.sql require the folder to equal auth.uid(), which would reject
+-- an editor's upload into the owner's folder — and the client swallows storage
+-- errors, so the entry would save with no receipt and no complaint.
+
+-- A folder name is only meaningful if it's actually a uuid; the guard keeps a
+-- stray object from erroring the whole policy.
+create or replace function public.receipt_folder_owner(object_name text)
+returns uuid
+language sql immutable as $$
+  select case
+    when (storage.foldername(object_name))[1] ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    then ((storage.foldername(object_name))[1])::uuid
+    else null
+  end;
+$$;
+
+drop policy if exists "receipts read own"   on storage.objects;
+drop policy if exists "receipts insert own" on storage.objects;
+drop policy if exists "receipts update own" on storage.objects;
+drop policy if exists "receipts delete own" on storage.objects;
+
 create policy "receipts read own" on storage.objects
   for select using (
     bucket_id = 'receipts'
-    and (
-      (storage.foldername(name))[1] = auth.uid()::text
-      or (
-        -- Guard the cast: a stray non-uuid folder must not error the policy.
-        (storage.foldername(name))[1] ~ '^[0-9a-fA-F-]{36}$'
-        and public.can_read_books(((storage.foldername(name))[1])::uuid)
-      )
-    )
+    and public.can_read_books(public.receipt_folder_owner(name))
+  );
+
+create policy "receipts insert own" on storage.objects
+  for insert with check (
+    bucket_id = 'receipts'
+    and public.can_write_books(public.receipt_folder_owner(name))
+  );
+
+-- upsert: true on the client issues an update when the object already exists,
+-- so this needs the same predicate or a re-scan of the same id fails.
+create policy "receipts update own" on storage.objects
+  for update using (
+    bucket_id = 'receipts'
+    and public.can_write_books(public.receipt_folder_owner(name))
+  );
+
+create policy "receipts delete own" on storage.objects
+  for delete using (
+    bucket_id = 'receipts'
+    and public.can_write_books(public.receipt_folder_owner(name))
   );
 
 -- ---- Accepting an invite ----------------------------------------------------

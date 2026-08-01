@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { useAppData } from "@/components/app/app-data";
 import { Button, Card, EmptyState, TextField } from "@/components/app/ui";
+import { switchBooksHref } from "@/lib/app/books";
 import type { ShareRole } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -234,7 +235,8 @@ export default function People({
               {sharedBooks.map((b) => (
                 <Link
                   key={b.owner_user_id}
-                  href={`/app?books=${b.owner_user_id}`}
+                  href={switchBooksHref(b.owner_user_id)}
+                  prefetch={false}
                   className="flex items-center justify-between gap-3 rounded-2xl px-1 py-1.5 hover:bg-[var(--bb-subtle)]"
                 >
                   <span className="min-w-0">

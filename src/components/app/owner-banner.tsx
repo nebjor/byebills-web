@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { switchBooksHref } from "@/lib/app/books";
 import type { ShareRole } from "@/lib/database.types";
 
 /**
@@ -18,7 +19,8 @@ export default function OwnerBanner({ name, role }: { name: string; role: ShareR
         </span>
       </span>
       <Link
-        href="/app"
+        href={switchBooksHref("mine")}
+        prefetch={false}
         className="shrink-0 text-[13px] font-bold text-[var(--bb-purple-ink)] underline underline-offset-2"
       >
         Back to mine

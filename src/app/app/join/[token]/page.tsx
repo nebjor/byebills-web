@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { switchBooksHref } from "@/lib/app/books";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -30,8 +31,9 @@ export default async function JoinPage({
 
   const { data, error } = await supabase.rpc("accept_share", { p_token: token }).single();
 
-  if (!error && data?.ok) {
-    redirect(`/app?books=${data.owner_user_id}`);
+  if (!error && data?.ok && data.owner_user_id) {
+    // Via the switch route so the active-books cookie actually gets set.
+    redirect(switchBooksHref(data.owner_user_id));
   }
 
   const reason = data?.message ?? error?.message ?? "invalid_token";

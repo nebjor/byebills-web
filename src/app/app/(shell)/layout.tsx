@@ -1,9 +1,11 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import AppNav from "@/components/app/nav";
 import { AppDataProvider } from "@/components/app/app-data";
 import OwnerBanner from "@/components/app/owner-banner";
+import { ACTIVE_BOOKS_COOKIE } from "@/lib/app/books";
 import type { AccessRole, ShareRole } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,19 +17,13 @@ import { createClient } from "@/lib/supabase/server";
  *   · user.id  — who is signed in
  *   · ownerId  — whose books are on screen
  * They differ when viewing books shared with you. Every query below is keyed
- * to ownerId; RLS decides whether that's allowed, so a forged ?books= param
- * returns nothing rather than someone else's data.
+ * to ownerId, and access is re-validated here on every render — so a tampered
+ * cookie falls back to your own books, and RLS would return nothing regardless.
  *
  * Onboarding is gated on app_profiles.onboarded_at — SERVER state, not
  * localStorage, so onboarding on the phone counts here too.
  */
-export default async function ShellLayout({
-  children,
-  searchParams,
-}: {
-  children: ReactNode;
-  searchParams?: Promise<{ books?: string }>;
-}) {
+export default async function ShellLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient();
 
   const {
@@ -37,10 +33,14 @@ export default async function ShellLayout({
   // The middleware already redirected anonymous visitors; this narrows the type.
   if (!user) redirect("/app/login");
 
-  const params = await searchParams;
-  const requested = params?.books;
+  // Set by /app/switch/[ownerId]. NOT a query param: Next.js gives
+  // `searchParams` to pages only, so a layout would never receive it and owner
+  // switching would silently never activate.
+  const jar = await cookies();
+  const requested = jar.get(ACTIVE_BOOKS_COOKIE)?.value;
 
-  // Books shared with this user, for the switcher and to validate ?books=.
+  // Books shared with this user — both for the switcher and to validate the
+  // cookie against current access, so a revoked share stops working at once.
   const { data: shared } = await supabase.rpc("shared_books");
   const sharedList = (shared ?? []) as {
     owner_user_id: string;
