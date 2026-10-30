@@ -24,6 +24,8 @@ export default function DropPage() {
   // Restore a previously entered password within this tab.
   useEffect(() => {
     const saved = sessionStorage.getItem(KEY_STORAGE);
+    // sessionStorage only exists in the browser, so this has to run after mount
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved) setAccessKey(saved);
   }, []);
 
