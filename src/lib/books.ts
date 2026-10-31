@@ -46,7 +46,7 @@ export function buildBooksCsv(data: BooksData): string {
 }
 
 // TODO: replace with the signed-in user's real transactions once an authenticated
-// app area exists and RLS on `transactions` is confirmed (see TODO.md). Transactions
+// app area exists and RLS on `transactions` is confirmed. Transactions
 // have no Milchbüechli category yet, so a mapping/aggregation step is needed too.
 export const sampleBooks: BooksData = {
   year: 2026,
