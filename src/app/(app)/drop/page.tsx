@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import InvoiceDrop from "@/components/invoice-drop";
 import BooksSummary from "@/components/books-summary";
@@ -15,19 +15,20 @@ const BORDER = "#EFE6D2";
 
 const KEY_STORAGE = "drop-demo-key";
 
+const subscribeNoop = () => () => {};
+
 export default function DropPage() {
-  const [accessKey, setAccessKey] = useState<string | null>(null);
+  // Password saved earlier in this tab (read without a setState-in-effect).
+  const savedKey = useSyncExternalStore(
+    subscribeNoop,
+    () => sessionStorage.getItem(KEY_STORAGE),
+    () => null
+  );
+  const [keyOverride, setAccessKey] = useState<string | null | undefined>(undefined);
+  const accessKey = keyOverride === undefined ? savedKey : keyOverride;
   const [input, setInput] = useState("");
   const [locked, setLocked] = useState(false); // true after a wrong-password bounce
   const [entries, setEntries] = useState<Entry[]>([]);
-
-  // Restore a previously entered password within this tab.
-  useEffect(() => {
-    const saved = sessionStorage.getItem(KEY_STORAGE);
-    // sessionStorage only exists in the browser, so this has to run after mount
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (saved) setAccessKey(saved);
-  }, []);
 
   function unlock(e: React.FormEvent) {
     e.preventDefault();

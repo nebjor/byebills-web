@@ -1,52 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { getPostHogClient } from "@/lib/posthog-server";
+import { errorResponse } from "@/lib/http";
+import { track } from "@/server/analytics";
+import { deleteAccount } from "@/server/account";
+import { authenticateBearer } from "@/server/auth";
 
 // Deletes the calling user's account and data. The app sends the user's
-// Authorization: Bearer <access token>. We verify it, then delete with the
-// service role (admin).
+// Authorization: Bearer <access token>; we verify it, then delete with the
+// service role.
 export async function POST(request: NextRequest) {
   try {
-    const auth = request.headers.get("authorization") ?? "";
-    const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7) : null;
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-
-    // 1. Verify the token -> which user is this?
-    const asUser = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-    const {
-      data: { user },
-      error: userErr,
-    } = await asUser.auth.getUser();
-    if (userErr || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    // 2. Delete their data + auth record with the service role.
-    const admin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-    // Delete all user-owned rows before removing the auth record.
-    await admin.from("app_transactions").delete().eq("user_id", user.id);
-    await admin.from("app_hustles").delete().eq("user_id", user.id);
-    await admin.from("extraction_usage").delete().eq("user_id", user.id);
-    await admin.from("user_entitlements").delete().eq("user_id", user.id);
-
-    // Remove the user's receipt images from Storage.
-    const { data: files } = await admin.storage.from("receipts").list(user.id);
-    if (files?.length) {
-      await admin.storage.from("receipts").remove(files.map((f) => `${user.id}/${f.name}`));
-    }
-
-    const { error: delErr } = await admin.auth.admin.deleteUser(user.id);
-    if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
-
-    const posthog = getPostHogClient();
-    posthog.capture({ distinctId: user.id, event: "account_deleted" });
-    await posthog.shutdown();
-
+    const { user } = await authenticateBearer(request.headers.get("authorization"));
+    await deleteAccount(user.id);
+    await track(user.id, "account_deleted");
     return NextResponse.json({ ok: true });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return errorResponse(err, "account-delete");
   }
 }

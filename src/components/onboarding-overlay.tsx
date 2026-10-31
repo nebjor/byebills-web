@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 type OnboardingStep = {
   title: string;
@@ -28,18 +28,20 @@ const steps: OnboardingStep[] = [
 
 const STORAGE_KEY = "byebills-onboarding-done";
 
+const subscribeNoop = () => () => {};
+
 export default function OnboardingOverlay({ hasBusiness = false }: { hasBusiness?: boolean }) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    // Skip if user already has a business (not a first-timer)
-    if (hasBusiness) return;
-    // Only show if user hasn't completed onboarding in this browser
-    const done = localStorage.getItem(STORAGE_KEY);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!done) setVisible(true);
-  }, [hasBusiness]);
+  const [dismissed, setDismissed] = useState(false);
+  // Reads localStorage without a setState-in-effect; the server snapshot is
+  // "done" so nothing renders during SSR/hydration.
+  const alreadyDone = useSyncExternalStore(
+    subscribeNoop,
+    () => localStorage.getItem(STORAGE_KEY) !== null,
+    () => true
+  );
+  // Skip for users who already have a business (not first-timers)
+  const visible = !hasBusiness && !alreadyDone && !dismissed;
 
   function handleNext() {
     if (currentStep < steps.length - 1) {
@@ -51,7 +53,7 @@ export default function OnboardingOverlay({ hasBusiness = false }: { hasBusiness
 
   function handleDismiss() {
     localStorage.setItem(STORAGE_KEY, "true");
-    setVisible(false);
+    setDismissed(true);
   }
 
   if (!visible) return null;
