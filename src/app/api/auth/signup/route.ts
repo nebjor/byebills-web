@@ -1,36 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
-import { getPostHogClient } from "@/lib/posthog-server";
+import { errorResponse } from "@/lib/http";
+import { track } from "@/server/analytics";
+import { ensureUserProfile } from "@/server/auth";
+import { enforceRateLimit } from "@/server/rate-limit";
 
-// Server-side profile creation endpoint — called after client-side signup
+// Server-side profile creation endpoint, called after client-side signup
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
+  try {
+    await enforceRateLimit(request.headers, { bucket: "signup", max: 10, windowSeconds: 3600 });
 
-  // Verify the user is authenticated
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    await ensureUserProfile(user);
+    await track(user.id, "user_signed_up", undefined, { email: user.email });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return errorResponse(err, "signup");
   }
-
-  // Upsert user profile using service role (bypasses RLS)
-  const admin = createServiceClient();
-  const { error } = await (admin.from("users") as any).upsert(
-    { id: user.id, email: user.email ?? null },
-    { onConflict: "id" }
-  );
-
-  if (error) {
-    return NextResponse.json({ error: "Failed to create profile" }, { status: 500 });
-  }
-
-  const posthog = getPostHogClient();
-  posthog.identify({ distinctId: user.id, properties: { email: user.email } });
-  posthog.capture({ distinctId: user.id, event: "user_signed_up" });
-  await posthog.shutdown();
-
-  return NextResponse.json({ ok: true });
 }

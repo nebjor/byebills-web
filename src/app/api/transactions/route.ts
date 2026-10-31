@@ -1,69 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getPostHogClient } from "@/lib/posthog-server";
+import { errorResponse } from "@/lib/http";
+import { track } from "@/server/analytics";
+import { parseCreateTransaction } from "@/server/transactions/schema";
+import { createTransaction } from "@/server/transactions/service";
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const body = await request.json();
-  const { business_id, duplicate_hash, ...transactionData } = body;
-
-  // Sanitize payment_method to allowed values
-  const allowedPaymentMethods = ["cash", "bank", "twint", "card", "other"];
-  if (transactionData.payment_method && !allowedPaymentMethods.includes(transactionData.payment_method)) {
-    transactionData.payment_method = "other";
-  }
-
-  if (!business_id) {
-    return NextResponse.json(
-      { error: "business_id required" },
-      { status: 400 }
-    );
-  }
-
-  // Insert transaction
-  const { data: transaction, error } = await supabase
-    .from("transactions")
-    .insert({
-      ...transactionData,
-      business_id,
-      duplicate_hash,
-      verified: true,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    if (error.code === "23505") {
-      return NextResponse.json(
-        { error: "Duplicate transaction" },
-        { status: 409 }
-      );
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+
+    const body = await request.json().catch(() => null);
+    const parsed = parseCreateTransaction(body);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+
+    const transaction = await createTransaction(supabase, user.id, parsed.data);
+
+    // TODO: Trigger sync to Google Sheets / other integrations here
+
+    await track(user.id, "transaction_created", {
+      transaction_type: parsed.data.type,
+      document_type: parsed.data.document_type,
+      currency: parsed.data.currency,
+      payment_method: parsed.data.payment_method,
+    });
+
+    return NextResponse.json({ transaction });
+  } catch (err) {
+    return errorResponse(err, "transactions");
   }
-
-  // TODO: Trigger sync to Google Sheets / other integrations here
-
-  const posthog = getPostHogClient();
-  posthog.capture({
-    distinctId: user.id,
-    event: "transaction_created",
-    properties: {
-      transaction_type: transactionData.type,
-      document_type: transactionData.document_type,
-      currency: transactionData.currency,
-      payment_method: transactionData.payment_method,
-    },
-  });
-  await posthog.shutdown();
-
-  return NextResponse.json({ transaction });
 }
