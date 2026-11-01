@@ -94,11 +94,7 @@ export default function Terms() {
           </Section>
 
           <Section title="14. Changes & contact">
-            We may update these terms; material changes are reflected by the date above. Questions:{" "}
-            <a href="mailto:jneber@proton.me" className="font-semibold text-brand">
-              jneber@proton.me
-            </a>
-            .
+            We may update these terms; material changes are reflected by the date above. Questions: please contact us through the account or subscription page in the app.
           </Section>
         </div>
       </div>

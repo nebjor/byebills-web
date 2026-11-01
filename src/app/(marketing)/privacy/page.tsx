@@ -26,12 +26,8 @@ export default function Privacy() {
           </p>
 
           <Section title="1. Controller & contact">
-            The data controller is <strong>[Your legal entity, Switzerland — name & address]</strong>. Data-protection
-            contact:{" "}
-            <a href="mailto:jneber@proton.me" className="font-semibold text-brand">
-              jneber@proton.me
-            </a>
-            . If you are in the EU/EEA, our representative under Art. 27 GDPR is{" "}
+            The data controller is <strong>[Your legal entity, Switzerland — name & address]</strong>. You can
+            reach us about data protection through the account or subscription page in the app. If you are in the EU/EEA, our representative under Art. 27 GDPR is{" "}
             <strong>[EU representative — to appoint]</strong>.
           </Section>
 
@@ -89,7 +85,7 @@ export default function Privacy() {
 
           <Section title="9. Your rights">
             You can request access to, correction, deletion, restriction, or a copy (portability) of your data, and
-            object to or withdraw consent for certain processing. Exercise these in the app or by emailing us. You may
+            object to or withdraw consent for certain processing. Exercise these in the app or by contacting us through the account or subscription page. You may
             also complain to the Swiss Federal Data Protection and Information Commissioner (FDPIC) or, in the EU/EEA,
             your local data-protection authority.
           </Section>
@@ -105,11 +101,7 @@ export default function Privacy() {
           </Section>
 
           <Section title="12. Changes & contact">
-            We may update this policy; material changes are reflected by the date above. Questions or requests:{" "}
-            <a href="mailto:jneber@proton.me" className="font-semibold text-brand">
-              jneber@proton.me
-            </a>
-            .
+            We may update this policy; material changes are reflected by the date above. Questions or requests: please contact us through the account or subscription page in the app.
           </Section>
         </div>
       </div>
